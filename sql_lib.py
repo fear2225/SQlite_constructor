@@ -1,9 +1,24 @@
-__version__ = "1.0.2"
+__version__ = "1.1.0"
 __author__ = "https://github.com/fear2225"
+
+import requests
+
 '''
-[!] In PyCharm comment trouble :c
-[!] One DataBase one connection method
+    Python-SQLite framwork
+
+[*] In PyCharm comment trouble :c
+[!] Not fully tested :c
 '''
+
+# TODO List
+"""
+1) Remove _text returns in methods
+2) Add MIN, NAX ... etc
+3) Add more types
+4) Add keywords dictionary
+5) Remove self.data
+"""
+
 
 
 # Internal
@@ -34,19 +49,6 @@ def DEFAULT(text): return f'DEFAULT {text}'
 AUTOINCREMENT = 'AUTOINCREMENT'
 
 # ============================================================
-# TODO Do i need it?
-def tryExcept(toExec):
-    def _targetFunc(*args, **kwargs):
-        try:
-            targetReturn = toExec(*args, **kwargs)
-            return targetReturn
-        except:
-            print(f'[!] Error in <{toExec.__name__}>!')
-            return None
-
-    return _targetFunc
-
-# TODO comments
 class Types_SQLite:
     '''
     Parent class for SQLite data types
@@ -70,11 +72,11 @@ class Types_SQLite:
         self.data = None
 
     # Oveload vvvvvv
-    def __str__(self, *args):
-        return f'{self.name}={args[0]}'
+    def __str__(self):
+        return f'{self.add()}'
 
-    def zip(self, *args) -> str:
-        self.data = str(args)
+    def zip(self, *args) -> object:
+        self.data = str(args[0])
         return self
 
     def unzip(self, *args) -> object:
@@ -95,6 +97,7 @@ class Types_SQLite:
         return f'{self.name} {self.type} {self._add_opt()},'
 
 
+# ============================================================
 class INTEGER(Types_SQLite):
     '''
     int to INT
@@ -125,17 +128,77 @@ class TEXT(Types_SQLite):
         return f'{args[0]}'
 
 
+# todo Path to TEXT
+class FILE(Types_SQLite):
+    '''
+    file path to TEXT, unzip - open file
+    '''
+    def __init__(self, name, root:Path, opt=''):
+        super(FILE, self).__init__(name=name, opt=opt, sqlType='TEXT')
+        self.root = root
+
+    def zip(self, *args) -> Types_SQLite:
+        self.data = str(args[0])
+        return self
+
+    def unzip(self, *args) -> Path:
+        return args[0]
+
+    @staticmethod
+    def nameGen(start:int=1):
+        while True:
+            yield str(start)
+            start+=1
+
+
+class LIST(Types_SQLite):
+    '''
+    list to TEXT, zip separated by sep="," (default)
+    '''
+    def __init__(self, name, opt='', sep:str=','):
+        super(LIST, self).__init__(name=name, opt=opt, sqlType='TEXT')
+        self.sep = sep
+
+    def zip(self, *args) -> Types_SQLite:
+        self.data = sep.join([str(i) for i in args])
+        return self
+
+    def unzip(self, *args:str) -> list:
+        return args[0].split(sep=self.sep)
+
+
+# ============================================================
+# TODO maybe one day...
+# class Functions_SQLite(Types_SQLite):
+#     def __init__(self):
+#         self.name = ''
+#
+#     def MAX(self, column_:Types_SQLite):
+#         self.name = f'MAX ({column_.name})'
+#         return self
+
+
+# ============================================================
 class TableObject():
     '''
     Common Usage:
     # Connect
     DataBase_connect = sqlite3.connect(path)
     DataBase_cursor = DataBase_connect.cursor()
+   
     # Table creation
     TableName = TableObject(name=tableName, cursor=DataBase_cursor)
-    TableName.fillColumns(column1:Types_SQLite, ..., columnN:Types_SQLite)
+    columnName1 = TEXT()
+        ...        ...
+    columnNameN = INTEGER()
+    TableName.fillColumns(columnName1.add(), ..., columnNameN.add())
     TableName.createTable()
-
+    
+    # Use methods
+    TableName.insert(columnName1, ..., colinmNameN)
+    tableData = TableName.select(colunmName1, ..., columnNameN)
+    TableName.delete(*TableName.all())
+    
     '''
 
     def __init__(self, name:str, base:sqlite3.Connection):
@@ -146,14 +209,18 @@ class TableObject():
         self.columns = []   # Add auto fill table
 
 
+    def all(self):
+        return [i for i in self.columns]
 
-    def fillColumns(self, columns:list[Types_SQLite]) -> None:
+
+    def fillColumns(self, *args:Types_SQLite) -> None:
         '''
         Add columns in table
         :param columns: list[Types_SQLite]
         :return: None
         '''
-        self.columns = columns
+
+        self.columns = [i for i in args]
 
 
     def createTable(self):
@@ -163,14 +230,15 @@ class TableObject():
 
         :return: str -> SQLite create table request
         '''
+
         _text = f'CREATE TABLE IF NOT EXISTS {self.tableName} ('
         for i in self.columns:
             _text+= ' ' + i.add()
         _text = _text[:-1] + ');'
-        print(_text)    # todo remove
 
         self.cursor.execute(_text)
         self.base.commit()
+
         return _text
 
 
@@ -244,15 +312,15 @@ class TableObject():
         return _text
 
 
-    def select(self, *args:Types_SQLite, WHERE:str, as_list:bool=False) -> list:
+    def select(self, *args:Types_SQLite, WHERE:str='', as_list:bool=False) -> list:
         '''
         Select a columns value from a table
+        For all select (*) use: *tableName.all()
         Usage:
         tableName.select(column1, ..., columnN, WHERE="table1>0")
 
         SELECT [tableName] <colunm1>, ..., <columnN> | *
         FROM tableName WHERE <condition>
-
 
         :param args: Types_SQLite -> columns to return
         :param WHERE: str -> WHERE <condition>
@@ -262,7 +330,8 @@ class TableObject():
         '''
 
         _text = f'SELECT {",".join([i.name for i in args])} ' \
-                f'FROM {self.tableName} WHERE {WHERE}'
+                f'FROM {self.tableName} '
+        if WHERE: _text += f'WHERE {WHERE}'
 
         print(_text)
         self.cursor.execute(_text)
@@ -272,7 +341,6 @@ class TableObject():
             return [self._as_list(*args, _line=i) for i in _result]
         else:
             return [self._as_dict(*args, _line=i) for i in _result]
-
 
 
     def _as_dict(self, *args:Types_SQLite, _line):
@@ -285,45 +353,94 @@ class TableObject():
         '''Return data as a list'''
         return [args[_iter].unzip(_val) for _iter, _val in enumerate(_line)]
 
-    """
-    MIN, MAX, COUNT, SUM, TOTAL, AWG
-    """
+
+# ============================================================
 
 
-    def where(self, *args:Types_SQLite):
-        '''
+# TODO I don`t know how it works, but may be one day...
+"""MIN, MAX, COUNT, SUM, TOTAL, AWG"""
 
-        :param args:
-        :return:
-        '''
-        _text = []
-        for i in args:
-            _text.append(i.__str__())
-        return ' AND '.join(_text)
+def defineFunk_name(funk):
+    '''Funcktion mane become variable'''
+    def target(column):
+        return funk(funk.__name__, column)
+    return target
+
+@defineFunk_name
+def MAX(name, column:Types_SQLite) -> str: return f' {name} ({column.name}) '
+
+@defineFunk_name
+def MIN(name, column:Types_SQLite) -> str: return f' {name} ({column.name}) '
+
+@defineFunk_name
+def COUNT(name, column:Types_SQLite) -> str: return f' {name} ({column.name}) '
+
+@defineFunk_name
+def SUM(name, column:Types_SQLite) -> str: return f' {name} ({column.name}) '
+
+@defineFunk_name
+def TOTAL(name, column:Types_SQLite) -> str: return f' {name} ({column.name}) '
+
+@defineFunk_name
+def AWG(name, column:Types_SQLite) -> str: return f' {name} ({column.name}) '
+
+
+def where(self, *args):
+    '''
+    Method connect different conditions with " AND "
+
+    :param args: str -> <conditions> to connect
+    :return: str -> <condition1> AND ... AND <conditionN>
+    '''
+    _text = []
+    for i in args:
+        _text.append(i.__str__())
+    return ' AND '.join(_text)
 
 
 # ============================================================
 if __name__ == '__main__':
+    '''
+    Download and save in database 3 cat pictures 
+    '''
+
     path = Path.cwd()/'sql.db'
 
     _database = sqlite3.connect(path)
     cursor = _database.cursor()
 
+    # test
+    imgNameGen = FILE.nameGen(0)
+    gen_next = imgNameGen.__next__
 
-    link = TEXT(name='link')
-    link1 = TEXT(name='link1')
-    int1 = INTEGER(name='int1')
+    url = TEXT(name='url', opt=UNIQUE)
+    image = FILE(name='image', root=Path.cwd())
+    size = INTEGER(name='size')
 
+    imaglink = TableObject('imaglink', base=_database)
+    imaglink.fillColumns(url, image, size)
+    imaglink.createTable()
 
-    table1 = TableObject('table1', base=_database)
-    table1.fillColumns([link, link1, int1])
-    table1.createTable()
-    print(table1.insert(int1.zip(17), link.zip('asddsa')))
-    print(table1.update(link1.zip('17'), WHERE=f'{int1.name}=17'))
+    testURL = ["https://img2.joyreactor.cc/pics/post/%D0%BA%D0%BE%D1%82%D1%8D-7698621.jpeg",
+                "https://img2.joyreactor.cc/pics/post/%D0%BA%D0%BE%D1%82%D1%8D-7698620.png",
+               "https://img2.joyreactor.cc/pics/post/%D0%BA%D0%BE%D1%82%D1%8D-7698619.jpeg"]
+    import requests
+    for i in range(3):
+        req = requests.get(testURL[i])
+        _temp = [testURL[i], image.root/(gen_next()+'.jpg')]
+        print(_temp)
+        with open(_temp[1], 'wb') as f:
+            f.write(req.content)
+            _temp.append(
+                _temp[1].stat().st_size
+            )
 
-    x = table1.select(int1, link1, WHERE=f'int1>0', as_list=True)
-    for i in x:
+            imaglink.insert(url.zip(_temp[0]),
+                            image.zip(_temp[1]),
+                            size.zip(_temp[2]))
+
+    for i in imaglink.select(*imaglink.all()):
         print(i)
 
-    # print(table1.delete(WHERE=f'{int1.name} > 10 AND {link.name} = "asddsa"'))
+    # end
     pass
