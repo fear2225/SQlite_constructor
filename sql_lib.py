@@ -1,4 +1,4 @@
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 __author__ = "https://github.com/fear2225"
 '''
 [!] In PyCharm comment trouble :c
@@ -34,6 +34,7 @@ def DEFAULT(text): return f'DEFAULT {text}'
 AUTOINCREMENT = 'AUTOINCREMENT'
 
 # ============================================================
+# TODO Do i need it?
 def tryExcept(toExec):
     def _targetFunc(*args, **kwargs):
         try:
@@ -49,28 +50,35 @@ def tryExcept(toExec):
 class Types_SQLite:
     '''
     Parent class for SQLite data types
+
+    super().__init__(name, sqlType, opt)
+    name:str -> columnName
+    sqlType:str -> TEXT, INT, REAL or BLOB
+    opt:str -> sqlite column options
+
     Children classes need overload:
     zip, unzip, __str__
     '''
-    def __init__(self, name:str, opt:[str, list]=''):
+    def __init__(self, name:str, sqlType, opt:[str, list]=''):
         self.name = name
         if isinstance(opt, str):
             self.opt = [opt]
         else:
             self.opt = opt
 
-        self.type = 'None'
-        self.data:bytes = None
+        self.type = sqlType
+        self.data = None
 
     # Oveload vvvvvv
-    def __str__(self):
-        return self.data.decode()
+    def __str__(self, *args):
+        return f'{self.name}={args[0]}'
 
-    def zip(self, arg:str) -> None:
-        self.data = arg.encode()
+    def zip(self, *args) -> str:
+        self.data = str(args)
+        return self
 
-    def unzip(self):
-        return self.data
+    def unzip(self, *args) -> object:
+        return args
     # Overload ^^^^^^
 
     def addOpt(self, *args):
@@ -88,33 +96,33 @@ class Types_SQLite:
 
 
 class INTEGER(Types_SQLite):
+    '''
+    int to INT
+    '''
     def __init__(self, name, opt=''):
-        super(INTEGER, self).__init__(name, opt)
-        self.type = 'INTEGER'
+        super(INTEGER, self).__init__(name=name, opt=opt, sqlType='INTEGER')
 
-    def __str__(self):
-        return f'{self.data}'
+    def zip(self, *args) -> Types_SQLite:
+        self.data = str(args[0])
+        return self
 
-    def zip(self, arg) -> None:
-        self.data = int(arg)
-
-    def unzip(self):
-        return self.data
+    def unzip(self, *args) -> int:
+        return int(args[0])
 
 
 class TEXT(Types_SQLite):
+    '''
+    str to TEXT
+    '''
     def __init__(self, name, opt=''):
-        super(TEXT, self).__init__(name, opt)
-        self.type = 'TEXT'
+        super(TEXT, self).__init__(name=name, opt=opt, sqlType='TEXT')
 
-    def __str__(self):
-        return self.data
+    def zip(self, *args:str) -> Types_SQLite:
+        self.data = str(args[0])
+        return self
 
-    def zip(self, arg:str) -> None:
-        self.data = str(self.data)
-
-    def unzip(self):
-        return self.data
+    def unzip(self, *args) -> str:
+        return f'{args[0]}'
 
 
 class TableObject():
@@ -166,96 +174,137 @@ class TableObject():
         return _text
 
 
-    def insert(self,  *args, OR='', DEFAULT:bool=False, **kwargs):
+    def insert(self,  *args:Types_SQLite, OR='', DEFAULT:bool=False):
         '''
-        Write new line in table with args and or kwargs walues
+        Write new line in the table with multipe values
+        Usage:
+        tableName.insert(colunm1.zip(dataToWrite1), ..., columnN.zip(dataToWriteN))
 
-        INSERT [OR <if>] INTO <tableName> (<column1>, ..., <columnN>)
+        INSERT [OR <condition>] INTO <tableName> (<column1>, ..., <columnN>)
         VALUES (<inColunm1>, ..., <inColumnN>) | DEFAULT VALUES;
 
-
-        :param args: clolumnName1, toColumn1, ..., ..., columnNameN, toColumnN
+        :param args: Types_SQLite.zip(...), ...,
         :param OR: str -> [OR <condition>]
         :param DEFAULT: bool -> True if [DEFAULT VALUES]
-        :param kwargs: {columnName1:toColumn1, ..., columnNameN:toColumnN}
         :return:
         '''
-
-        # args to kwargs
-        kwargs = {**kwargs, **{args[i]:args[i+1] for i in range(len(args)) if not i%2}}
-
-        _key, _val = [], []
-        for k, v in kwargs.items():
-            _key.append(k)
-            _val.append(v)
 
         _text = f'INSERT {OR} INTO {self.tableName} ' \
-                f'({", ".join(_key)}) ' \
-                f'VALUES ({",".join(len(_key)*["?"])}) '
+                f'({", ".join([i.name for i in args])}) ' \
+                f'VALUES ({",".join(len(args)*["?"])}) '
         if DEFAULT: _text += 'OR DEFAULT VALUES;'   # Not work
 
-        self.cursor.execute(_text, _val)
+        self.cursor.execute(_text, [i.data for i in args])
         self.base.commit()
 
         # print(_text)
-        return _key, _val
+        return _text, [i.data for i in args]
 
 
-    def update(self, *args, OR='', WHERE='', **kwargs):
+    def update(self, *args, OR='', WHERE=''):
         '''
-        Update columns in table with args or kwargs
+        Update the value in the cell
+        Usage:
+        tableName.update(column1.zip(dataToUpdate1), ..., columnN.zip(dataToUpdateN))
 
-        UPDATE [OR <if>] [DataBaseName] tableName SET <column1>=<inColunm1>,
-         ..., <columnN>=<inColumnN>, [WHERE <if>];
+        UPDATE [OR <condition>] [DataBaseName] tableName SET <column1>=<inColunm1>,
+         ..., <columnN>=<inColumnN>, [WHERE <condition>];
 
-        :param args: clolumnName1, toColumn1, ..., ..., columnNameN, toColumnN
+        :param args: Types_SQLite.zip(...), ...,
         :param OR: str -> [OR <condition>]
         :param WHERE: str -> [WHERE <condition>]
-        :param kwargs: {columnName1:toColumn1, ..., columnNameN:toColumnN}
         :return:
         '''
 
-        # args to kwargs
-        kwargs = {**kwargs, **{args[i]: args[i + 1] for i in range(len(args)) if not i % 2}}
-
-        _key, _val = [], []
-        for k, v in kwargs.items():
-            _key.append(k)
-            _val.append(v)
-
         _text = f'UPDATE {OR} {self.tableName} ' \
-                f'SET {",".join([i+"=?" for i in _key])} '
+                f'SET {",".join([i.name+"=?" for i in args])} '
         if WHERE: _text += f'WHERE {WHERE}'
 
-        self.cursor.execute(_text, _val)
+        self.cursor.execute(_text, [i.data for i in args])
         self.base.commit()
 
-        # print(_text)
-        return _key, _val
+        return _text
 
 
-    """
-    DELETE FROM [DatBaseName] tableName
-    [WHERE <if>];
-    """
+    def delete(self, WHERE:str):
+        '''
+        Delete lines a table that match a condition
+        
+        DELETE FROM [DatBaseName] tableName WHERE <condition>;
 
-    '''
-    SELECT [tableName] <colunm1>, ..., <columnN> | *
-    FROM tableName WHERE <if>
-    '''
+        :param WHERE:str -> WHERE <condition>
+        '''
+        
+        _text = f'DELETE FROM {self.tableName} ' \
+                 f'WHERE {WHERE}'
+
+        self.cursor.execute(_text)
+        self.base.commit()
+
+        return _text
+
+
+    def select(self, *args:Types_SQLite, WHERE:str, as_list:bool=False) -> list:
+        '''
+        Select a columns value from a table
+        Usage:
+        tableName.select(column1, ..., columnN, WHERE="table1>0")
+
+        SELECT [tableName] <colunm1>, ..., <columnN> | *
+        FROM tableName WHERE <condition>
+
+
+        :param args: Types_SQLite -> columns to return
+        :param WHERE: str -> WHERE <condition>
+        :param as_list: bool -> if True return values as list
+                                if False return as dict
+        :return: [[selectedValues1], ..., [selectedValuesN]]
+        '''
+
+        _text = f'SELECT {",".join([i.name for i in args])} ' \
+                f'FROM {self.tableName} WHERE {WHERE}'
+
+        print(_text)
+        self.cursor.execute(_text)
+        _result = self.cursor.fetchall()
+
+        if as_list:
+            return [self._as_list(*args, _line=i) for i in _result]
+        else:
+            return [self._as_dict(*args, _line=i) for i in _result]
+
+
+
+    def _as_dict(self, *args:Types_SQLite, _line):
+        '''Return data as list of dictionaries'''
+        return [dict({args[_iter].name : args[_iter].unzip(_val)}) \
+                for _iter, _val in enumerate(_line)]
+
+
+    def _as_list(self, *args:Types_SQLite, _line):
+        '''Return data as a list'''
+        return [args[_iter].unzip(_val) for _iter, _val in enumerate(_line)]
 
     """
     MIN, MAX, COUNT, SUM, TOTAL, AWG
     """
 
 
+    def where(self, *args:Types_SQLite):
+        '''
+
+        :param args:
+        :return:
+        '''
+        _text = []
+        for i in args:
+            _text.append(i.__str__())
+        return ' AND '.join(_text)
+
 
 # ============================================================
 if __name__ == '__main__':
     path = Path.cwd()/'sql.db'
-    #
-    # x = DataBase(path=path)
-    # print(x.execAndCommit())
 
     _database = sqlite3.connect(path)
     cursor = _database.cursor()
@@ -265,12 +314,16 @@ if __name__ == '__main__':
     link1 = TEXT(name='link1')
     int1 = INTEGER(name='int1')
 
-    # int1.addOpt(UNIQUE, PRIMAK_KEY, DEFAULT(f'10'))
 
     table1 = TableObject('table1', base=_database)
     table1.fillColumns([link, link1, int1])
     table1.createTable()
-    print(table1.insert(int1.name, 124, link.name, 'niece!', link1.name, 'qwenperfect!'))
-    table1.update(link.name, 'it`s working!', WHERE=f'{int1.name} == 124')
+    print(table1.insert(int1.zip(17), link.zip('asddsa')))
+    print(table1.update(link1.zip('17'), WHERE=f'{int1.name}=17'))
 
+    x = table1.select(int1, link1, WHERE=f'int1>0', as_list=True)
+    for i in x:
+        print(i)
+
+    # print(table1.delete(WHERE=f'{int1.name} > 10 AND {link.name} = "asddsa"'))
     pass
