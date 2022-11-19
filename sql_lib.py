@@ -20,10 +20,8 @@ import requests
 """
 
 
-
 # Internal
 import sqlite3
-import types
 
 from pathlib import Path
 
@@ -160,7 +158,7 @@ class LIST(Types_SQLite):
         self.sep = sep
 
     def zip(self, *args) -> Types_SQLite:
-        self.data = sep.join([str(i) for i in args])
+        self.data = self.sep.join([str(i) for i in args])
         return self
 
     def unzip(self, *args:str) -> list:
@@ -184,10 +182,9 @@ class TableObject():
     Common Usage:
     # Connect
     DataBase_connect = sqlite3.connect(path)
-    DataBase_cursor = DataBase_connect.cursor()
-   
+
     # Table creation
-    TableName = TableObject(name=tableName, cursor=DataBase_cursor)
+    TableName = TableObject(name=tableName, base=DataBase_connect)
     columnName1 = TEXT()
         ...        ...
     columnNameN = INTEGER()
@@ -297,7 +294,7 @@ class TableObject():
     def delete(self, WHERE:str):
         '''
         Delete lines a table that match a condition
-        
+
         DELETE FROM [DatBaseName] tableName WHERE <condition>;
 
         :param WHERE:str -> WHERE <condition>
@@ -369,21 +366,6 @@ def defineFunk_name(funk):
 @defineFunk_name
 def MAX(name, column:Types_SQLite) -> str: return f' {name} ({column.name}) '
 
-@defineFunk_name
-def MIN(name, column:Types_SQLite) -> str: return f' {name} ({column.name}) '
-
-@defineFunk_name
-def COUNT(name, column:Types_SQLite) -> str: return f' {name} ({column.name}) '
-
-@defineFunk_name
-def SUM(name, column:Types_SQLite) -> str: return f' {name} ({column.name}) '
-
-@defineFunk_name
-def TOTAL(name, column:Types_SQLite) -> str: return f' {name} ({column.name}) '
-
-@defineFunk_name
-def AWG(name, column:Types_SQLite) -> str: return f' {name} ({column.name}) '
-
 
 def where(self, *args):
     '''
@@ -399,9 +381,9 @@ def where(self, *args):
 
 
 # ============================================================
-if __name__ == '__main__':
+def test_main():
     '''
-    Download and save in database 3 cat pictures 
+    Download and save in database 3 cat pictures
     '''
 
     path = Path.cwd()/'sql.db'
@@ -443,4 +425,10 @@ if __name__ == '__main__':
         print(i)
 
     # end
+    pass
+
+
+# ============================================================
+if __name__ == '__main__':
+    test_main()
     pass
