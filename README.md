@@ -12,6 +12,7 @@ pip install pathlib
 ```
 
 ## How to use  
+See test_main function example
 ### Connect to database
 Start SQLite database connection
 ```
@@ -39,6 +40,7 @@ tableName = TableObject(name='tableName', base=Database_connect)
 tableName.fillColumns(colunm1, ..., columnN) # add columns in table
 tableName.createTable() # Create table in database (if not exist)
 ```
+
 ### Relised commands
 #### INSERT
 Add new row in table
@@ -69,8 +71,35 @@ return:
   alif as_list=False:  
     [[{... : ...}, ..., {... : ...}], ..., [{... : ...}, ..., {... : ...}]]  
     list of pairs {columnName:data} in sequence it asked  
-
+  
 ## New python-SQLite data type
+Class inhertance:
+```
+class typeName(Types_SQLite):
+  def __init__(self, name, opt):
+    super().__init__(name=name, sqlType='SQLiteDataType', opt=opt)
+    '''
+    name:str -> columnName
+    sqlType:str -> TEXT, INT, REAL or BLOB
+    opt:str -> sqlite column options
+    '''
+  def zip(dataToZip) -> Types_SQLite:
+    self.data = str(dataToZip)   # save data in SQLite analolg type
+    return self
+  
+  def unzip(*args) -> object:
+    # do sth to unzip data
+    return int(args[0])
 
+```
 
-## Project structure && data types
+## Some SQLite
+- TEXT <-> str  
+- INTEGET <-> int  
+- BLOB <-> bytes  
+- REAL <-> float
+- NULL <-> None
+---
+
+## 
+
