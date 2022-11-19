@@ -3,7 +3,13 @@ Python framework for facilitating SQLite database management
   
 ---
 ## Table of contents  
-
+1) Dependence
+2) How to use
+   - Colimn definition
+   - Table definition
+   - Basic commands
+   - New python-SQLite data type
+3) Some SQLite 
 
 ## Dependence
 Install pathlib or coment import and FILE lines
@@ -41,7 +47,7 @@ tableName.fillColumns(colunm1, ..., columnN) # add columns in table
 tableName.createTable() # Create table in database (if not exist)
 ```
 
-### Relised commands
+### Basic commands
 #### INSERT
 Add new row in table
 ```
@@ -68,11 +74,11 @@ return:
   if as_list=True:  
     [[...], [...], ..., [...]]  
     list of data in sequence it asked   
-  alif as_list=False:  
+  elif as_list=False:  
     [[{... : ...}, ..., {... : ...}], ..., [{... : ...}, ..., {... : ...}]]  
     list of pairs {columnName:data} in sequence it asked  
   
-## New python-SQLite data type
+### New python-SQLite data type
 Class inhertance:
 ```
 class typeName(Types_SQLite):
