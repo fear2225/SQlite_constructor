@@ -67,6 +67,7 @@ tableName.delete(WHERE=f"{column2}>0)
 ```
 #### SELECT
 Select data from table
+[i] use \*tableName.all() to select all columns
 ```
 tableName.select(column1, ..., columnN, WHERE=f"{column1}='cat'", as_list=True)
 ```
