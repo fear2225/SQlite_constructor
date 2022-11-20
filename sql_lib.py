@@ -17,6 +17,7 @@ import requests
 3) Add more types
 4) Add keywords dictionary
 5) Remove self.data
+6) Add more sql function supptort data type
 """
 
 
@@ -96,6 +97,38 @@ class Types_SQLite:
 
 
 # ============================================================
+class COUNTER(Types_SQLite):
+    '''
+    AUTOINCRIMENT
+    '''
+    def __init__(self, name):
+        super(COUNTER, self).__init__(name=name, opt=f'{PRIMAK_KEY} {AUTOINCREMENT}', sqlType='INTEGER')
+        self.data = None
+
+    def zip(self, *args) -> Types_SQLite:
+        return self
+
+    def unzip(self, *args) -> int:
+        return int(args[0])
+
+
+class BOOL(Types_SQLite):
+    '''
+    Any to bool to INT
+    '''
+    def __init__(self, name, opt=''):
+        super(BOOL, self).__init__(name=name, opt=opt, sqlType='INTEGER')
+
+    def zip(self, *args) -> Types_SQLite:
+        if not args[0]:
+            self.data = 0
+        else:
+            self.data = 1
+        return self
+
+    def unzip(self, *args) -> bool:
+        return bool(args[0])
+
 class INTEGER(Types_SQLite):
     '''
     int to INT
@@ -395,12 +428,13 @@ def test_main():
     imgNameGen = FILE.nameGen(0)
     gen_next = imgNameGen.__next__
 
-    url = TEXT(name='url', opt=UNIQUE)
+    count = COUNTER(name='count')
+    url = TEXT(name='url')
     image = FILE(name='image', root=Path.cwd())
     size = INTEGER(name='size')
 
     imaglink = TableObject('imaglink', base=_database)
-    imaglink.fillColumns(url, image, size)
+    imaglink.fillColumns(count, url, image, size)
     imaglink.createTable()
 
     testURL = ["https://img2.joyreactor.cc/pics/post/%D0%BA%D0%BE%D1%82%D1%8D-7698621.jpeg",
@@ -417,7 +451,8 @@ def test_main():
                 _temp[1].stat().st_size
             )
 
-            imaglink.insert(url.zip(_temp[0]),
+            imaglink.insert(count.zip(),
+                            url.zip(_temp[0]),
                             image.zip(_temp[1]),
                             size.zip(_temp[2]))
 
