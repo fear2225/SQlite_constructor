@@ -30,7 +30,9 @@ Database_connect = sqlite3.connect(path)
 Chose python-to-SQLite data method:  
   - TEXT: str -> TEXT  
   - INTEGER: int -> INT  
-  - LIST: list -> TEXT(zip list into ','-separated TEXT type)
+  - LIST: list -> TEXT(zip list into ','-separated TEXT type)  
+  - BOOL: bool -> INT(0|1)  
+  - COUNTER: -> PRIMARY KEY AUTOINCREMENT
  ```
  colunm1 = TEXT('columnName1', opt = 'UNIQUE')
  column2 = INTEGER('columnName2')
