@@ -12,12 +12,15 @@ import requests
 
 # TODO List
 """
-1) Remove _text returns in methods
-2) Add MIN, NAX ... etc
-3) Add more types
-4) Add keywords dictionary
-5) Remove self.data
+1) Remove _text returns in methods      <- Done
+2) Add MIN, NAX                         <- Done
+3) Add more types                       <- 2 More
+4) Add keywords dictionary              <- Done
+5) Remove self.data                     <- Done
 6) Add more sql function supptort data type
+7) ADD/DROP columns                     <- Done
+8) ORDER BY ASC/DESC
+9) Errors handlers!!!
 """
 
 
@@ -68,15 +71,19 @@ class Types_SQLite:
             self.opt = opt
 
         self.type = sqlType
-        self.data = None
+
+    def IS_NULL(self) -> str:
+        return f'{self.name} IS NULL'
+
+    def IS_NOT_NULL(self) -> str:
+        return f'{self.name} IS NOT NULL'
 
     # Oveload vvvvvv
     def __str__(self):
         return f'{self.add()}'
 
-    def zip(self, *args) -> object:
-        self.data = str(args[0])
-        return self
+    def zip(self, *args) -> dict:
+        return {self.name:str[0]}
 
     def unzip(self, *args) -> object:
         return args
@@ -93,7 +100,7 @@ class Types_SQLite:
         return ' '.join([i for i in self.opt])
 
     def add(self) -> str:
-        return f'{self.name} {self.type} {self._add_opt()},'
+        return f'"{self.name}" {self.type} {self._add_opt()}'
 
 
 # ============================================================
@@ -103,10 +110,9 @@ class COUNTER(Types_SQLite):
     '''
     def __init__(self, name):
         super(COUNTER, self).__init__(name=name, opt=f'{PRIMAK_KEY} {AUTOINCREMENT}', sqlType='INTEGER')
-        self.data = None
 
-    def zip(self, *args) -> Types_SQLite:
-        return self
+    def zip(self, *args) -> dict:
+        return {self.name:None}
 
     def unzip(self, *args) -> int:
         return int(args[0])
@@ -119,12 +125,8 @@ class BOOL(Types_SQLite):
     def __init__(self, name, opt=''):
         super(BOOL, self).__init__(name=name, opt=opt, sqlType='INTEGER')
 
-    def zip(self, *args) -> Types_SQLite:
-        if not args[0]:
-            self.data = 0
-        else:
-            self.data = 1
-        return self
+    def zip(self, *args) -> dict:
+        return {self.name:0 if not args[0] else 1}
 
     def unzip(self, *args) -> bool:
         return bool(args[0])
@@ -136,9 +138,8 @@ class INTEGER(Types_SQLite):
     def __init__(self, name, opt=''):
         super(INTEGER, self).__init__(name=name, opt=opt, sqlType='INTEGER')
 
-    def zip(self, *args) -> Types_SQLite:
-        self.data = str(args[0])
-        return self
+    def zip(self, *args) -> dict:
+        return {self.name:int(args[0])}
 
     def unzip(self, *args) -> int:
         return int(args[0])
@@ -151,9 +152,8 @@ class TEXT(Types_SQLite):
     def __init__(self, name, opt=''):
         super(TEXT, self).__init__(name=name, opt=opt, sqlType='TEXT')
 
-    def zip(self, *args:str) -> Types_SQLite:
-        self.data = str(args[0])
-        return self
+    def zip(self, *args:str) -> dict:
+        return {self.name:args[0]}
 
     def unzip(self, *args) -> str:
         return f'{args[0]}'
@@ -168,9 +168,8 @@ class FILE(Types_SQLite):
         super(FILE, self).__init__(name=name, opt=opt, sqlType='TEXT')
         self.root = root
 
-    def zip(self, *args) -> Types_SQLite:
-        self.data = str(args[0])
-        return self
+    def zip(self, *args) -> dict:
+        return {self.name:str(args[0])}
 
     def unzip(self, *args) -> Path:
         return args[0]
@@ -191,8 +190,7 @@ class LIST(Types_SQLite):
         self.sep = sep
 
     def zip(self, *args) -> Types_SQLite:
-        self.data = self.sep.join([str(i) for i in args])
-        return self
+        return {self.name:self.sep.join([str(i) for i in args])}
 
     def unzip(self, *args:str) -> list:
         return args[0].split(sep=self.sep)
@@ -234,12 +232,11 @@ class TableObject():
     def __init__(self, name:str, base:sqlite3.Connection):
         self.tableName = name
         self.base = base
-        print(self.base)
         self.cursor = self.base.cursor()
         self.columns = []   # Add auto fill table
 
 
-    def all(self):
+    def all(self) -> list:
         return [i for i in self.columns]
 
 
@@ -252,8 +249,10 @@ class TableObject():
 
         self.columns = [i for i in args]
 
+        return None
 
-    def createTable(self):
+
+    def createTable(self, req=False) -> None:
         '''
         CREATE TABLE IF NOT EXISTS
         tableName (column1, ..., columnN);
@@ -261,18 +260,19 @@ class TableObject():
         :return: str -> SQLite create table request
         '''
 
-        _text = f'CREATE TABLE IF NOT EXISTS {self.tableName} ('
+        _text = f'CREATE TABLE IF NOT EXISTS "{self.tableName}" ('
         for i in self.columns:
-            _text+= ' ' + i.add()
+            _text+= ' ' + i.add() + ','
         _text = _text[:-1] + ');'
 
+        if req: print(_text)
         self.cursor.execute(_text)
         self.base.commit()
 
-        return _text
+        return None
 
 
-    def insert(self,  *args:Types_SQLite, OR='', DEFAULT:bool=False):
+    def insert(self,  *args, OR='', DEFAULT:bool=False, req=False, **kwargs) -> None:
         '''
         Write new line in the table with multipe values
         Usage:
@@ -286,20 +286,22 @@ class TableObject():
         :param DEFAULT: bool -> True if [DEFAULT VALUES]
         :return:
         '''
+        for i in args:
+            kwargs|=i
 
-        _text = f'INSERT {OR} INTO {self.tableName} ' \
-                f'({", ".join([i.name for i in args])}) ' \
+        _text = f'INSERT {OR} INTO "{self.tableName}" ' \
+                f'({", ".join([i for i in kwargs.keys()])}) ' \
                 f'VALUES ({",".join(len(args)*["?"])}) '
         if DEFAULT: _text += 'OR DEFAULT VALUES;'   # Not work
 
-        self.cursor.execute(_text, [i.data for i in args])
+        if req: print(_text, [i.values() for i in args])
+        self.cursor.execute(_text, [i for i in kwargs.values()])
         self.base.commit()
 
-        # print(_text)
-        return _text, [i.data for i in args]
+        return None
 
 
-    def update(self, *args, OR='', WHERE=''):
+    def update(self, *args, OR='', WHERE='', req=False, **kwargs) -> None:
         '''
         Update the value in the cell
         Usage:
@@ -314,17 +316,22 @@ class TableObject():
         :return:
         '''
 
-        _text = f'UPDATE {OR} {self.tableName} ' \
-                f'SET {",".join([i.name+"=?" for i in args])} '
+        if len(args):
+            for i in args:
+                kwargs|=i
+
+        _text = f'UPDATE {OR} "{self.tableName}" ' \
+                f'SET {",".join([i+"=?" for i in kwargs.keys()])} '
         if WHERE: _text += f'WHERE {WHERE}'
 
-        self.cursor.execute(_text, [i.data for i in args])
+        if req: print(_text)
+        self.cursor.execute(_text, [i for i in kwargs.values()])
         self.base.commit()
 
-        return _text
+        return None
 
 
-    def delete(self, WHERE:str):
+    def delete(self, WHERE:str, req=False) -> None:
         '''
         Delete lines a table that match a condition
 
@@ -333,16 +340,17 @@ class TableObject():
         :param WHERE:str -> WHERE <condition>
         '''
         
-        _text = f'DELETE FROM {self.tableName} ' \
+        _text = f'DELETE FROM "{self.tableName}" ' \
                  f'WHERE {WHERE}'
 
+        if req: print(_text)
         self.cursor.execute(_text)
         self.base.commit()
 
-        return _text
+        return None
 
 
-    def select(self, *args:Types_SQLite, WHERE:str='', as_list:bool=False) -> list:
+    def select(self, *args:Types_SQLite, WHERE:str='', as_list:bool=False, req=False) -> list:
         '''
         Select a columns value from a table
         For all select (*) use: *tableName.all()
@@ -360,17 +368,113 @@ class TableObject():
         '''
 
         _text = f'SELECT {",".join([i.name for i in args])} ' \
-                f'FROM {self.tableName} '
+                f'FROM "{self.tableName}" '
         if WHERE: _text += f'WHERE {WHERE}'
 
-        print(_text)
+        if req: print(_text)
         self.cursor.execute(_text)
         _result = self.cursor.fetchall()
 
-        if as_list:
-            return [self._as_list(*args, _line=i) for i in _result]
-        else:
-            return [self._as_dict(*args, _line=i) for i in _result]
+        return [self._as_list(*args, _line=i) for i in _result] if as_list \
+                else [self._as_dict(*args, _line=i) for i in _result]
+
+
+    # ALTER TABLE
+    def ADD_COLUMN(self, column:Types_SQLite, req=False) -> None:
+        '''
+        Add new column
+
+        ALTER TABLE <tableName> ADD COLUMN <columnName> <type>
+
+        :param column: Types_SQLite
+        :return: None
+        '''
+
+        _text = f'ALTER TABLE {self.tableName} ' \
+                f'ADD COLUMN {column.add()}'
+
+        if req: print(_text)
+        self.cursor.execute(_text)
+        self.base.commit()
+
+        self.columns.append(column)
+
+        return None
+
+
+    def DROP_COLUMN(self, column:Types_SQLite, req=False) -> None:
+        '''
+        Delete column
+
+        ALTER TABLE <tableName> DROP COLUMN <columnName>
+
+        :param column: str -> columnName
+        :return: None
+        '''
+
+        _text = f'ALTER TABLE {self.tableName} ' \
+                f'DROP COLUMN {column.name}'
+
+        if req: print(_text)
+        self.cursor.execute(_text)
+        self.base.commit()
+
+        if column in self.columns:
+            self.columns.pop(column)
+
+        return None
+
+
+    # One resulr funktions
+    def MAX(self, column:Types_SQLite):
+        '''
+        Return max value
+
+        SELECT MAX(<column>) FROM tableName
+
+        :param column: Types_SQLite
+        :return: unzip(MAX(column))
+        '''
+        _text = f"SELECT MAX ({column.name}) FROM {self.tableName}"
+
+        self.cursor.execute(_text)
+        _result = self.cursor.fetchone()
+
+        return column.unzip(_result[0])
+
+
+    def MIN(self, column:Types_SQLite):
+        '''
+        Return min value
+
+        SELECT MIN(<column>) FROM tableName
+
+        :param column: Types_SQLite
+        :return: unzip(MIN(column))
+        '''
+        _text = f"SELECT MIN ({column.name}) FROM {self.tableName}"
+
+        self.cursor.execute(_text)
+        _result = self.cursor.fetchone()
+
+        return column.unzip(_result[0])
+
+    #
+    # def AWG(self, column:Types_SQLite):
+    #     '''
+    #     Return AWG value
+    #
+    #     SELECT AWG(<column>) FROM tableName
+    #
+    #     :param column: Types_SQLite
+    #     :return: unzip(AWG(column))
+    #     '''
+    #     _text = f"SELECT AWG ({column.name}) FROM {self.tableName}"
+    #
+    #     self.cursor.execute(_text)
+    #     _result = self.cursor.fetchone()
+    #
+    #     return column.unzip(_result[0])
 
 
     def _as_dict(self, *args:Types_SQLite, _line):
@@ -438,7 +542,7 @@ def test_main():
     imaglink.createTable()
 
     testURL = ["https://img2.joyreactor.cc/pics/post/%D0%BA%D0%BE%D1%82%D1%8D-7698621.jpeg",
-                "https://img2.joyreactor.cc/pics/post/%D0%BA%D0%BE%D1%82%D1%8D-7698620.png",
+               "https://img2.joyreactor.cc/pics/post/%D0%BA%D0%BE%D1%82%D1%8D-7698620.png",
                "https://img2.joyreactor.cc/pics/post/%D0%BA%D0%BE%D1%82%D1%8D-7698619.jpeg"]
     import requests
     for i in range(3):
@@ -453,11 +557,25 @@ def test_main():
 
             imaglink.insert(count.zip(),
                             url.zip(_temp[0]),
-                            image.zip(_temp[1]),
                             size.zip(_temp[2]))
+
 
     for i in imaglink.select(*imaglink.all()):
         print(i)
+
+    newColumn1 = TEXT('test1')
+    newColumn2 = TEXT('test2')
+
+    imaglink.ADD_COLUMN(newColumn1, req=True)
+    print(imaglink.columns)
+    imaglink.ADD_COLUMN(newColumn2, req=True)
+    print(imaglink.columns)
+
+    imaglink.DROP_COLUMN(newColumn1, req=True)
+    print(imaglink.columns)
+
+    print(ENDL, imaglink.MAX(url))
+    print(ENDL, imaglink.MIN(url))
 
     # end
     pass
@@ -466,4 +584,6 @@ def test_main():
 # ============================================================
 if __name__ == '__main__':
     test_main()
+
+
     pass
