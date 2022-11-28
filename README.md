@@ -7,7 +7,8 @@ Python framework for facilitating SQLite database management
 2) How to use
    - Colimn definition
    - Table definition
-   - Basic commands
+   - Basic commands  
+   - Alter table  
    - New python-SQLite data type
 3) Some SQLite 
 
@@ -80,7 +81,22 @@ return:
   elif as_list=False:  
     [[{... : ...}, ..., {... : ...}], ..., [{... : ...}, ..., {... : ...}]]  
     list of pairs {columnName:data} in sequence it asked  
-  
+#### MIN/MAX
+Return unziped min/max column value  
+```
+tableName.MIN(column)
+```  
+### AlTER TABLE  
+#### ADD COLUMN  
+ Add new column  
+ ```
+ tableName.ADD_COLUMN(column)
+ ```
+#### DROP COLUMN  
+Delete column  
+```
+tableName.DROP_COLUMN(column)
+```
 ### New python-SQLite data type
 Class inhertance:
 ```
