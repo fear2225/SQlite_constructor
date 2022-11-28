@@ -1,4 +1,4 @@
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 __author__ = "https://github.com/fear2225"
 
 import requests
@@ -194,17 +194,6 @@ class LIST(Types_SQLite):
 
     def unzip(self, *args:str) -> list:
         return args[0].split(sep=self.sep)
-
-
-# ============================================================
-# TODO maybe one day...
-# class Functions_SQLite(Types_SQLite):
-#     def __init__(self):
-#         self.name = ''
-#
-#     def MAX(self, column_:Types_SQLite):
-#         self.name = f'MAX ({column_.name})'
-#         return self
 
 
 # ============================================================
@@ -459,7 +448,7 @@ class TableObject():
 
         return column.unzip(_result[0])
 
-    #
+    # todo
     # def AWG(self, column:Types_SQLite):
     #     '''
     #     Return AWG value
@@ -492,7 +481,7 @@ class TableObject():
 
 
 # TODO I don`t know how it works, but may be one day...
-"""MIN, MAX, COUNT, SUM, TOTAL, AWG"""
+"""COUNT, SUM, TOTAL, AWG"""
 
 def defineFunk_name(funk):
     '''Funcktion mane become variable'''
