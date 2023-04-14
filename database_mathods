@@ -1,0 +1,208 @@
+__version__ = '14.4.23'
+__author__ = 'https://github.com/fear2225'
+
+'''
+Database access methods
+via SQLite
+'''
+
+# External
+import sqlite3
+
+# Internal
+
+# Consts
+ENDL = '\n' + '=' * 40 + '\n'
+
+# ============================================================
+
+class TableObj:
+    connect: sqlite3.Connection
+    tableName: str
+    schema: dict
+
+    def __init__(self, connect: sqlite3.Connection):
+        """ SQLite table object """
+        self.connect = connect
+        self.cursor = self.connect.cursor()
+
+    def __repr__(self):
+
+        self._schema()
+        text = f'{("Table: "+ self.tableName):^31}\n' \
+               f'{"Name":^15}|{"Type":^15}\n'
+        for key, val in self.schema.items():
+            text += f'{key:^15}|{val:^15}\n'
+
+        return text
+
+    def _get(self, command) -> list:
+        """ Get && fetchall """
+
+        self.cursor.execute(command)
+
+        return self.cursor.fetchall()
+
+    def _exec(self, command, *args) -> bool:
+        """ Execute && error handle """
+
+        try:
+            self.cursor.execute(command, args)
+            self.connect.commit()
+
+        except sqlite3.IntegrityError as e:
+            print(f'[!] SQL IntegrityError:\n'
+                  f'\t{command}\n'
+                  f'\targs:{args}')
+            return False
+        return True
+
+    def _schema(self):
+        """ Parse schema """
+
+        self.cursor.execute(f'PRAGMA table_info({self.tableName});')
+        raw_schema = self.cursor.fetchall()
+
+        self.schema = {}
+        for i in raw_schema:
+            self.schema |= {i[1]: i[2]}
+
+    def names(self) -> list:
+        """ List column names """
+        return [i for i in self.schema.keys()]
+
+    def create(self, tableName, **kwargs) -> bool:
+        """ Create table if exists && update schema """
+
+        self.tableName = tableName
+
+        command = f''' CREATE TABLE IF NOT EXISTS "{self.tableName}" '''
+        table_args = ''
+        for key, value in kwargs.items():
+            table_args += f'"{key}" {value}, '
+        command += f'({table_args[:-2]});'
+
+        to_return = self._exec(command)
+        self._schema()
+
+        return to_return
+
+    def insert(self, **kwargs) -> bool:
+        """ INSERT INTO
+        input: dict like obj
+        returns True on success
+        """
+
+        command = f'INSERT INTO "{self.tableName}" ' \
+                  f'({",".join(kwargs.keys())}) ' \
+                  f'VALUES ({",".join(len(kwargs.keys()) * ["?"])});'
+
+        return self._exec(command, *kwargs.values())
+
+    def update(self, **kwargs) -> bool:
+        """ UPDATE """
+
+        if 'where' in kwargs.keys():
+            where = kwargs['where']
+            kwargs.pop('where')
+
+        command = f'UPDATE "{self.tableName}" ' \
+                  f'SET {",".join([i + "=?" for i in kwargs.keys()])}'
+
+        if 'where' in locals():
+            command += f' where {where}'
+        command += ';'
+
+        return self._exec(command, *kwargs.values())
+
+    def select(self, *args, where='') -> list:
+        """ SELECT VALUE
+        input: args
+        returns [dict] """
+
+        command = f'SELECT {",".join(args) if args else "*"} ' \
+                  f'FROM "{self.tableName}" '
+
+        if where:
+            command += where
+        command += ';'
+
+        self.cursor.execute(command)
+        to_return = []
+        while True:
+            frame = self.cursor.fetchone()
+            if frame is None:
+                break
+            temp = {}
+            for key, value in zip(args if args else self.schema.keys(),
+                                  frame):
+                temp |= {key: value}
+            to_return.append(temp)
+
+        return to_return
+
+    def delete(self, where: str) -> bool:
+        """ DELETE """
+
+        command = f'DELETE FROM "{self.tableName}" WHERE {where};'
+
+        return self._exec(command)
+
+    # ALTER TABLE
+    def add_column(self, column: dict) -> bool:
+        """ ADD COLUMN """
+
+        command = f'ALTER TABLE "{self.tableName}" ' \
+                  f'ADD COLUMN {str(column).replace(":", "")[1:-1]};'
+
+        return self._exec(command)
+
+    def drop_column(self, columnName) -> bool:
+        """ DROP COLUMN """
+
+        command = f'ALTER TABLE "{self.tableName}" ' \
+                  f'DROP COLUMN {columnName};'
+
+        return self._exec(command)
+
+    def command(self, command, *args):
+        """ Custom SQLite command execute & commit """
+
+        return self._exec(command, *args)
+
+    # TODO forbidden words
+    BAD_NAMES = ['where', 'or']
+
+
+def test():
+    conTable = sqlite3.Connection('test.db')
+    table = TableObj(conTable)
+    table.create(tableName='name', colunm='INT NULL',
+                 Name='TEXT', surName='TEXT UNIQUE')
+
+    print(table.schema, end=ENDL)
+
+    import random
+    table.insert(surName=str(random.randint(0, 9999)))
+    print(table.select("Name", "surName", where=''))
+    print(table.select(), end=ENDL)
+
+    print(table.update(Name='Masha', where=' surName > 8000'))
+    print(table.select())
+
+    print(table.names())
+    print(table)
+
+    print(table.add_column({'added': 'TEXT'}))
+    print(table)
+
+    print(table.drop_column('added'))
+    print(table)
+
+    pass
+
+
+# ============================================================
+if __name__ == '__main__':
+    test()
+    pass
